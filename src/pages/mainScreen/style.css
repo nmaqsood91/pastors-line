@@ -1,0 +1,31 @@
+:root {
+  --purple: #46139f;
+  --dark-purple: #46139fd0;
+  --orange: #ff7f50;
+  --dark-orange: #ff7f50e3;
+}
+
+.all-contacts-btn {
+  background-color: var(--purple);
+  color: white;
+}
+
+.all-contacts-btn:hover {
+  background-color: var(--dark-purple);
+  color: white;
+}
+
+.close-btn {
+  border: 1px var(--purple) solid !important;
+  background-color: white;
+}
+
+.us-contacts-btn {
+  background-color: var(--orange);
+  color: white;
+}
+
+.us-contacts-btn:hover {
+  background-color: var(--dark-orange);
+  color: white;
+}
