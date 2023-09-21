@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
+import { makeUseAxios } from "axios-hooks";
 import Modal from "../../components/Modal";
 import axiosInstance from "../../api";
 import Loader from "../../components/Loader";
 import { connect } from "react-redux";
 import ContactDetailsModal from "../../components/ContactDetailsModal";
 import { showContactDetailModal } from "../../store/actions";
+
+const useAxios = makeUseAxios({
+  axios: axiosInstance,
+});
 
 const debounceDelay = 2000;
 
@@ -13,59 +18,28 @@ function UsContacts({
   isDetailModalVisible,
   showContactDetailModal,
 }) {
-  const [usContacts, setUsContact] = useState({
-    // this is a data of found contacts
-    745450: {
-      id: 745450,
-      first_name: "Jason1",
-      last_name: "Alexis1",
-      email: null,
-      phone_number: "9404480524",
-      country_id: 226,
-    },
-    502931: {
-      id: 502931,
-      first_name: "jason",
-      last_name: "Alexis",
-      email: "",
-      phone_number: "0",
-      country_id: 226,
-    },
-  });
+  const [usContacts, setUsContact] = useState({});
   const [currentContactDetails, setCurrentContactDetails] = useState({});
   const [search, setSearch] = useState("");
   const abortController = new AbortController();
 
   const [isChecked, setIsChecked] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    const params = {
+  const [{ data }, refetch] = useAxios({
+    url: "/contacts.json",
+    params: {
       companyId: 560,
-      countryId: 226,
       query: search,
-      /*  ,
+      noGroupDuplicates: 1,
+    },
+  });
 
-      page: 1, // Replace with your desired page number
-  
-      noGroupDuplicates: 1, */
-    };
-    await axiosInstance
-      .get("/contacts.json", {
-        params,
-      })
-      .then(function ({ data }) {
-        setUsContact(data.contacts);
-        setSearch(null);
-      })
-      .catch(function (error) {
-        // handle error
-        console.log(error);
-      });
-  };
+  useEffect(() => {
+    if (data) {
+      setUsContact(data?.contacts);
+    }
+  }, [data]);
+
   const fetchContactDetails = (id) => {
     setCurrentContactDetails(usContacts[id]);
     showContactDetailModal();
@@ -76,16 +50,16 @@ function UsContacts({
     setSearch(newSearchTerm);
   };
 
-  const handleEnterKeyPress = (event) => {
+  const handleEnterKeyEvent = (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      fetchData();
+      refetch();
     }
   };
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      fetchData();
+      refetch();
     }, debounceDelay);
 
     return () => {
@@ -98,12 +72,11 @@ function UsContacts({
     setIsChecked(!isChecked);
   };
 
-  const filterData = (data) => {
+  const filterData = (contacts) => {
     if (isChecked) {
-      return Object.values(data).filter((item) => item.id % 2 === 0);
-    } else {
-      return Object.values(data);
+      return Object.values(contacts).filter((contact) => contact.id % 2 === 0);
     }
+    return Object.values(contacts);
   };
 
   return (
@@ -113,7 +86,7 @@ function UsContacts({
           placeholder="Search..."
           onChange={handleSearchInputChange}
           value={search}
-          onKeyDown={handleEnterKeyPress}
+          onKeyDown={handleEnterKeyEvent}
         />
         {Object.keys(usContacts).length ? (
           <table className="table">

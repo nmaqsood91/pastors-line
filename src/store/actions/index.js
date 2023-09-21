@@ -10,7 +10,6 @@ export const hideModal = () => ({
   type: "CLOSE",
 });
 
-
 export const showContactDetailModal = () => ({
   type: "SHOW_CONTACT_DETAILS",
 });
@@ -18,5 +17,3 @@ export const showContactDetailModal = () => ({
 export const closeContactDetailModal = () => ({
   type: "CLOSE_CONTACT_DETAILS",
 });
-
-
