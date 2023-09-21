@@ -1,72 +1,60 @@
-import { useEffect, useState } from "react";
-import { makeUseAxios } from "axios-hooks";
+import React, { useEffect, useState, useRef } from "react";
 import Modal from "../../components/Modal";
 import axiosInstance from "../../api";
 import Loader from "../../components/Loader";
+import ContactTable from "../../components/Table";
 import { connect } from "react-redux";
 import ContactDetailsModal from "../../components/ContactDetailsModal";
 import { showContactDetailModal } from "../../store/actions";
 
-const useAxios = makeUseAxios({
-  axios: axiosInstance,
-});
-
 const debounceDelay = 2000;
 
 function UsContacts({
-  isUsContactModalVisible,
+  isAllContactModalVisible,
   isDetailModalVisible,
   showContactDetailModal,
 }) {
-  const [usContacts, setUsContact] = useState({});
+  const [allContacts, setAllUsContacts] = useState([]);
   const [currentContactDetails, setCurrentContactDetails] = useState({});
   const [search, setSearch] = useState("");
-  const abortController = new AbortController();
-
   const [isChecked, setIsChecked] = useState(false);
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const tableContainerRef = useRef(null);
 
-  const [{ data }, refetch] = useAxios({
-    url: "/contacts.json",
-    params: {
-      companyId: 560,
-      query: search,
-      noGroupDuplicates: 1,
-    },
-  });
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axiosInstance.get("/contacts.json", {
+        params: {
+          companyId: 560,
+          query: search,
+          noGroupDuplicates: 1,
+          page,
+        },
+      });
+
+      // Handle the response data here
+      if (response.data) {
+        const contactsArray = Object.values(response.data.contacts);
+        if (contactsArray.length > 0)
+          setAllUsContacts((prevContacts) => [
+            ...prevContacts,
+            ...contactsArray,
+          ]);
+        else setAllUsContacts([]);
+      }
+    } catch (error) {
+      // Handle errors here
+      console.error("Error fetching data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (data) {
-      setUsContact(data?.contacts);
-    }
-  }, [data]);
-
-  const fetchContactDetails = (id) => {
-    setCurrentContactDetails(usContacts[id]);
-    showContactDetailModal();
-  };
-
-  const handleSearchInputChange = (event) => {
-    const newSearchTerm = event.target.value;
-    setSearch(newSearchTerm);
-  };
-
-  const handleEnterKeyEvent = (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      refetch();
-    }
-  };
-
-  useEffect(() => {
-    const debounceTimer = setTimeout(() => {
-      refetch();
-    }, debounceDelay);
-
-    return () => {
-      clearTimeout(debounceTimer);
-      abortController.abort();
-    };
-  }, [search]);
+    fetchData();
+  }, [search, page]);
 
   const handleCheckboxChange = () => {
     setIsChecked(!isChecked);
@@ -74,82 +62,98 @@ function UsContacts({
 
   const filterData = (contacts) => {
     if (isChecked) {
-      return Object.values(contacts).filter((contact) => contact.id % 2 === 0);
+      return contacts.filter((item) => item.id % 2 === 0);
     }
-    return Object.values(contacts);
+    return contacts;
+  };
+
+  const handleScroll = () => {
+    if (
+      tableContainerRef.current &&
+      tableContainerRef.current.scrollTop +
+        tableContainerRef.current.clientHeight >=
+        tableContainerRef.current.scrollHeight
+    ) {
+      setPage((prevPage) => prevPage + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.addEventListener("scroll", handleScroll);
+    }
+
+    return () => {
+      if (tableContainerRef.current) {
+        tableContainerRef.current.removeEventListener("scroll", handleScroll);
+      }
+    };
+  }, []);
+
+  const handleSearchInputChange = (event) => {
+    setSearch(event.target.value);
+  };
+
+  const fetchContactDetails = (id) => {
+    const contact = allContacts.find((item) => item.id === id);
+    if (contact) {
+      setCurrentContactDetails(contact);
+      showContactDetailModal();
+    }
   };
 
   return (
-    <>
-      <Modal showModal={isUsContactModalVisible} title="US Contacts">
+    <div>
+      <Modal showModal={isAllContactModalVisible} title="US Contacts">
         <input
           placeholder="Search..."
           onChange={handleSearchInputChange}
           value={search}
-          onKeyDown={handleEnterKeyEvent}
         />
-        {Object.keys(usContacts).length ? (
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col">Name</th>
-                <th scope="col">Email</th>
-                <th scope="col">Phone</th>
-                <th scope="col">Country</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filterData(usContacts).map((contact) => (
-                <tr
-                  key={contact.id}
-                  onClick={() => fetchContactDetails(contact.id)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <td>{contact.id}</td>
-                  <td>{contact.first_name}</td>
-                  <td>{contact.email}</td>
-                  <td>{contact.phone_number}</td>
-                  <td>{contact?.country?.iso}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="text-center">
-            <Loader />
-          </div>
-        )}
-
+        <div
+          ref={tableContainerRef}
+          style={{ maxHeight: "400px", overflowY: "auto" }}
+        >
+          {allContacts.length ? (
+            <ContactTable
+              allContacts={filterData(allContacts)}
+              onRowClick={fetchContactDetails}
+            />
+          ) : (
+            <div className="text-center">No Records Found</div>
+          )}
+          {isLoading && <Loader />}
+        </div>
         <div className="modal-footer justify-content-start">
-          <div class="form-check">
+          <div className="form-check">
             <input
-              class="form-check-input"
+              className="form-check-input"
               type="checkbox"
               checked={isChecked}
               onChange={handleCheckboxChange}
               id="flexCheckDefault"
             />
-            <label class="form-check-label" for="flexCheckDefault">
+            <label className="form-check-label" htmlFor="flexCheckDefault">
               Only even
             </label>
           </div>
         </div>
       </Modal>
-
       <ContactDetailsModal
         isDetailModalVisible={isDetailModalVisible}
         contact={currentContactDetails}
       />
-    </>
+    </div>
   );
 }
 
 const mapStateToProps = (state) => {
   return {
-    isUsContactModalVisible: state.isUsContactModalVisible,
+    isAllContactModalVisible: state.isAllContactModalVisible,
+    isDetailModalVisible: state.isDetailModalVisible,
   };
 };
+
 const mapDispatchToProps = (dispatch) => {
   return {
     showContactDetailModal: () => dispatch(showContactDetailModal()),
